@@ -1,0 +1,5 @@
+https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=http://localhost:3000/&response_type=code&scope=profile+email&access_type=online
+
+
+https://accounts.google.com/o/oauth2/v2/auth?client_id=68812465442-2q4tjran4vha31ijhph8grg0rehiqmk3.apps.googleusercontent.com&redirect_uri=http://localhost:3000/&response_type=code&scope=profile%20email%20openid&access_type=offline&prompt=consent
+
