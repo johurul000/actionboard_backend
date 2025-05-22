@@ -10,9 +10,11 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 from decouple import config
 from datetime import timedelta
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,7 +29,7 @@ SECRET_KEY = 'django-insecure-*3f@f1$^^m(my!zm_1e@)gx$0*58g$mfc$-&jj&616hb-p$-n$
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -40,7 +42,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.sites',  # Must come before allauth
+    'django.contrib.sites', 
+
+    'corsheaders',
     
     # Allauth apps
     'allauth',
@@ -52,7 +56,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     
-    # DJ Rest Auth (must come after allauth)
+    # DJ Rest Auth 
     'dj_rest_auth',
     'dj_rest_auth.registration',
     
@@ -66,6 +70,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     
+    'corsheaders.middleware.CorsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
 
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -112,12 +117,34 @@ SIMPLE_JWT = {
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
+
+STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_build', 'static')
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=config("DATABASE_URL"),
+        conn_max_age=600
+    )
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql_psycopg2',
+#         'HOST': config('DB_HOST', default=""),
+#         'NAME': 'postgres',
+#         'USER': 'postgres',
+#         'PORT': '5432',
+#         'PASSWORD': config('DB_PASSWORD', default=''),
+#     }
+# }
 
 
 # Password validation
@@ -195,3 +222,6 @@ REST_USE_JWT = True
 SITE_ID = 1
 
 AUTH_USER_MODEL = 'users.CustomUser'
+
+
+CORS_ALLOW_ALL_ORIGINS = DEBUG
