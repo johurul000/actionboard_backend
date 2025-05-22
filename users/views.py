@@ -78,8 +78,18 @@ class VerifyOTPView(APIView):
     
 
 class RegisterView(generics.CreateAPIView):
-    queryset = User.objects.all()
+    queryset = CustomUser.objects.all()
     serializer_class = RegisterSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        return Response({
+            "message": "An OTP has been sent to the given email",
+            "user": serializer.data
+        }, status=status.HTTP_201_CREATED)
 
 class SignInView(APIView):
     def post(self, request):
