@@ -62,6 +62,10 @@ INSTALLED_APPS = [
     
     # Your apps
     'users',
+    'organisations',
+    'meetings',
+    'transcripts',
+    'integrations',
 ]
 
 MIDDLEWARE = [
@@ -70,6 +74,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
 
@@ -126,7 +131,9 @@ SIMPLE_JWT = {
 
 
 STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_build', 'static')
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DATABASES = {
     'default': dj_database_url.config(

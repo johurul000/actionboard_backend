@@ -90,6 +90,7 @@ class RegisterView(generics.CreateAPIView):
             "message": "An OTP has been sent to the given email",
             "user": serializer.data
         }, status=status.HTTP_201_CREATED)
+    
 
 class SignInView(APIView):
     def post(self, request):
