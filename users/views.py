@@ -13,6 +13,7 @@ import random
 from rest_framework import generics
 from .serializers import *
 from .models import CustomUser
+from dj_rest_auth.serializers import JWTSerializer
 
 User = get_user_model()
 
@@ -64,7 +65,8 @@ class VerifyOTPView(APIView):
             if not user:
                 return Response({'error': 'User not found'}, status=404)
 
-            user.is_active = True  # activate user here
+            user.is_verified = True
+            user.is_active = True
             user.save()
 
             tokens = get_tokens_for_user(user)
@@ -99,35 +101,31 @@ class SignInView(APIView):
             return Response(serializer.validated_data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-# class GoogleLogin(SocialLoginView):
-#     adapter_class = GoogleOAuth2Adapter
-#     client_class = OAuth2LoginSerializer
 
-
-
-# class GoogleLogin(SocialLoginView): # if you want to use Authorization Code Grant, use this
-#     adapter_class = GoogleOAuth2Adapter
-#     # callback_url = "http://localhost:3000/"
-#     client_class = OAuth2Client
 
 class GoogleLogin(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
+    callback_url = "http://localhost:3000/"
     client_class = OAuth2Client
-    callback_url = "http://localhost:3000/"  # Must match frontend URL
 
-    # def get_serializer(self, *args, **kwargs):
-    #     serializer_class = self.get_serializer_class()
-    #     kwargs['context'] = self.get_serializer_context()
-    #     return serializer_class(*args, **kwargs)
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
 
-    @property
-    def client(self):
-        return OAuth2Client(
-            self.adapter_class.client_id,
-            self.adapter_class.client_secret,
-            self.adapter_class.access_token_method,
-            self.adapter_class.access_token_url,
-            self.callback_url,
-            ' '.join(self.adapter_class.scope),
-            scope_delimiter=' '
-        )
+        user = self.user  # Set after login
+        if user and not user.is_verified:
+            user.is_verified = True
+            user.save()
+
+        # Generate JWT tokens manually
+        refresh = RefreshToken.for_user(user)
+        data = {
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": {
+                "pk": user.pk,
+                "email": user.email,
+            },
+        }
+        return Response(data, status=status.HTTP_200_OK)
+    
+
