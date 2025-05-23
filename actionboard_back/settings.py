@@ -107,17 +107,31 @@ WSGI_APPLICATION = 'actionboard_back.wsgi.application'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # 'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
     ),
 }
+
 
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'AUTH_TOKEN_CLASSES': (
+        'rest_framework_simplejwt.tokens.AccessToken',
+        'rest_framework_simplejwt.tokens.RefreshToken',
+    ),
 }
 
+# rest auth
+REST_AUTH = {
+    'USE_JWT': True,
+    'JWT_AUTH_COOKIE': None,  # disable cookie usage
+    'JWT_AUTH_REFRESH_COOKIE': None,
+    'JWT_AUTH_HTTPONLY': True,  # optional, has no effect now
+    'SESSION_LOGIN': False,
+    'OLD_PASSWORD_FIELD_ENABLED': True,
+}
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
