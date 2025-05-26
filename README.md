@@ -2,7 +2,7 @@
 
 ### Prerequisites
 - Python 3.11 (do not use 3.12)
-- Django (latest version)
+- Django (As per requirements.txt)
 
 ### Installation
 
