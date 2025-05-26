@@ -1,7 +1,7 @@
 ## Getting Started
 
 ### Prerequisites
-- Python 3.x
+- Python 3.11 (do not use 3.12)
 - Django (latest version)
 
 ### Installation
