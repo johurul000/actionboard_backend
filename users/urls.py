@@ -10,5 +10,10 @@ urlpatterns = [
 
     path('register/', RegisterView.as_view(), name='register'),
     path('signin/', SignInView.as_view(), name='signin'),
-    path('dj-rest-auth/google/', GoogleLogin.as_view(), name='google_login')
+    path('dj-rest-auth/google/', GoogleLogin.as_view(), name='google_login'),
+
+    path('forgot-password/request-otp/', ForgotPasswordRequestOTPView.as_view(), name='forgot-password-request-otp'),
+    path('forgot-password/verify-otp/', VerifyOTPForForgotPasswordView.as_view(), name='forgot-password-verify-otp'),
+    path('forgot-password/reset/', ResetForgotPasswordView.as_view(), name='forgot-password-reset'),
+    path('change-password/', ChangePasswordView.as_view(), name='change-password'),
 ]
