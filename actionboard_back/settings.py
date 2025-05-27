@@ -59,8 +59,10 @@ INSTALLED_APPS = [
     # DJ Rest Auth 
     'dj_rest_auth',
     'dj_rest_auth.registration',
+
+    'django_countries',
     
-    # Your apps
+    # apps
     'users',
     'organisations',
     'meetings',
@@ -246,3 +248,13 @@ AUTH_USER_MODEL = 'users.CustomUser'
 
 
 CORS_ALLOW_ALL_ORIGINS = DEBUG
+
+
+# ZOOM
+ZOOM_CLIENT_ID = "QNffHL8pQzWjYUs27Nwk_A"
+ZOOM_CLIENT_SECRET = "sENnw0JFh6U82Q9qPUebDpycJm84Acor"
+
+
+# Backend Url
+
+BACKEND_URL = "http://localhost:8000"
