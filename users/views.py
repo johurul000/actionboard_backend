@@ -80,7 +80,9 @@ class VerifyOTPView(APIView):
                 'message': 'OTP verified. User activated and authenticated.',
                 'token': tokens['access'],
                 'refreshToken': tokens['refresh'],
-                'user': user,
+                'user': {
+                    'email': user.email
+                },
             }, status=200)
         return Response(serializer.errors, status=400)
     
