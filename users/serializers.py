@@ -69,7 +69,9 @@ class SignInSerializer(serializers.Serializer):
         return {
             "user_id": user.id,
             "email": user.email,
-            "name": user.name,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "country":  str(user.country),
             "access": str(refresh.access_token),
             "refresh": str(refresh),
         }
