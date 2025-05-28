@@ -81,7 +81,12 @@ class VerifyOTPView(APIView):
                 'token': tokens['access'],
                 'refreshToken': tokens['refresh'],
                 'user': {
-                    'email': email
+                    'user_id': user.id,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'country': str(user.country) if user.country else None,
+                    'date_of_birth': user.date_of_birth,
                 },
             }, status=200)
         return Response(serializer.errors, status=400)
