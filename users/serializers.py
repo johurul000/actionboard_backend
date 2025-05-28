@@ -67,11 +67,14 @@ class SignInSerializer(serializers.Serializer):
         refresh = RefreshToken.for_user(user)
 
         return {
-            "user_id": user.id,
-            "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "country":  str(user.country),
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
+            "user": {
+                "user_id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "country":  str(user.country),
+                "date_of_birth":  user.date_of_birth,
+            },
+            "token": str(refresh.access_token),
+            "refreshToken": str(refresh),
         }

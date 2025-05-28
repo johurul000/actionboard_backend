@@ -95,7 +95,7 @@ class RegisterView(generics.CreateAPIView):
         
         return Response({
             "message": "An OTP has been sent to the given email",
-            "user": serializer.data
+            "email": serializer.data["email"]
         }, status=status.HTTP_201_CREATED)
     
 
