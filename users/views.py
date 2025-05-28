@@ -81,7 +81,7 @@ class VerifyOTPView(APIView):
                 'token': tokens['access'],
                 'refreshToken': tokens['refresh'],
                 'user': {
-                    'email': user.email
+                    'email': email
                 },
             }, status=200)
         return Response(serializer.errors, status=400)
