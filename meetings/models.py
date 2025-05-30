@@ -2,24 +2,32 @@ from django.db import models
 
 # Create your models here.
 class Meeting(models.Model):
-    STATUS_CHOICES = (
-        ('uploaded', 'Uploaded'),
-        ('transcribed', 'Transcribed'),
-        ('summarized', 'Summarized'),
-    )
-
     organisation = models.ForeignKey('organisations.Organisation', on_delete=models.CASCADE, related_name='meetings')
-    created_by = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, related_name='created_meetings')
+    host = models.ForeignKey('users.CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='hosted_meetings')
 
-    title = models.CharField(max_length=255)
-    video_url = models.URLField(blank=True, null=True)  # OR use FileField if uploading
-    external_meeting_id = models.CharField(max_length=255, blank=True, null=True)  # Zoom/Meet ID
-    date = models.DateTimeField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='uploaded')
+    meeting_id = models.CharField(max_length=255, blank=True, null=True)
+    topic = models.CharField(max_length=255, blank=True)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField(null=True, blank=True)
+    duration = models.IntegerField(null=True, blank=True)  # In minutes
+
+    status = models.CharField(max_length=20, default='active', choices=(
+        ('active', 'Active'),
+        ('ended', 'Ended'),
+        ('deleted', 'Deleted'),
+    ))
+    
+    video_url = models.URLField(blank=True, null=True)
+    recording_ready = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-start_time']
 
     def __str__(self):
-        return self.title
+        return f"{self.topic} ({self.start_time})"
     
 class MeetingAttendee(models.Model):
     meeting = models.ForeignKey('meetings.Meeting', on_delete=models.CASCADE, related_name='attendees')

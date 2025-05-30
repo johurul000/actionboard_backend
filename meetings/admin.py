@@ -3,9 +3,9 @@ from .models import Meeting, MeetingAttendee
 
 @admin.register(Meeting)
 class MeetingAdmin(admin.ModelAdmin):
-    list_display = ('title', 'organisation', 'date', 'status')  # corrected spelling
+    list_display = ('topic', 'organisation', 'status')  # corrected spelling
     list_filter = ('organisation', 'status')  # corrected spelling
-    search_fields = ('title', 'organisation__name')  # corrected spelling
+    search_fields = ('topic', 'organisation__name')  # corrected spelling
 
 @admin.register(MeetingAttendee)
 class MeetingAttendeeAdmin(admin.ModelAdmin):
