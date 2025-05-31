@@ -17,8 +17,11 @@ class Meeting(models.Model):
         ('deleted', 'Deleted'),
     ))
     
-    video_url = models.URLField(blank=True, null=True)
+    video_url = models.URLField(max_length=500, blank=True, null=True)
     recording_ready = models.BooleanField(default=False)
+
+    join_url = models.URLField(max_length=500, blank=True, null=True)
+    start_url = models.URLField(max_length=800, blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -28,6 +31,7 @@ class Meeting(models.Model):
 
     def __str__(self):
         return f"{self.topic} ({self.start_time})"
+
     
 class MeetingAttendee(models.Model):
     meeting = models.ForeignKey('meetings.Meeting', on_delete=models.CASCADE, related_name='attendees')
