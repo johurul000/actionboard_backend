@@ -23,7 +23,7 @@ class ZoomOAuthStartView(APIView):
 
         state_data = f"{user_id}:{random_state}" 
 
-        redirect_uri = "http://localhost:8000/api/integrations/zoom/oauth/callback/"
+        redirect_uri = "http://localhost:3000/api/integrations/zoom/oauth/callback/"
         client_id = settings.ZOOM_CLIENT_ID
 
         query_params = {
