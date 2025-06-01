@@ -21,6 +21,8 @@ from django.http import JsonResponse
 import json
 from django.views.generic import ListView
 
+from transcripts.models import Transcript
+
 
 class CreateZoomMeetingView(APIView):
     permission_classes = [IsAuthenticated]
@@ -165,13 +167,37 @@ class ZoomWebhookView(View):
                         }
                     )
                     if not created:
-                        # Update fields if already exists
                         recording.play_url = rec.get("play_url")
                         recording.download_url = rec.get("download_url")
                         recording.recording_start = parse_datetime(rec.get("recording_start"))
                         recording.recording_end = parse_datetime(rec.get("recording_end"))
                         recording.save()
-                # Mark that recording is ready
+
+                    # If this is a transcript file
+                    if rec.get("file_type") in ["TIMELINE_TRANSCRIPT", "TRANSCRIPT"]:
+                        transcript_url = rec.get("download_url")
+                        oauth_token = self.get_zoom_oauth_token_for_meeting(meeting)
+                        if not oauth_token:
+                            print("Zoom not connected for this meeting's host!")
+                            continue
+
+                        headers = {
+                            "Authorization": f"Bearer {oauth_token.access_token}"
+                        }
+                        transcript_response = requests.get(transcript_url, headers=headers)
+                        if transcript_response.status_code == 200:
+                            full_transcript_text = transcript_response.text
+                            Transcript.objects.update_or_create(
+                                meeting=meeting,
+                                defaults={
+                                    "full_transcript": full_transcript_text,
+                                    "summary": {},
+                                    "language": "en"
+                                }
+                            )
+                        else:
+                            print("Failed to download Zoom transcript file.")
+
                 meeting.recording_ready = True
                 meeting.save()
 
@@ -179,6 +205,45 @@ class ZoomWebhookView(View):
 
     def get(self, request, *args, **kwargs):
         return JsonResponse({"error": "GET method not allowed"}, status=405)
+
+    def get_zoom_oauth_token_for_meeting(self, meeting):
+        """
+        Helper to get a valid Zoom OAuth token for the meeting's host.
+        Refreshes if expired.
+        """
+        host = meeting.host
+        if not host:
+            return None
+        try:
+            oauth_token = OAuthToken.objects.get(user=host, provider="zoom")
+        except OAuthToken.DoesNotExist:
+            return None
+
+        if oauth_token.expires_at <= timezone.now():
+            if not self.refresh_zoom_token(oauth_token):
+                return None
+        return oauth_token
+
+    def refresh_zoom_token(self, oauth_token):
+        refresh_url = "https://zoom.us/oauth/token"
+        auth = (settings.ZOOM_CLIENT_ID, settings.ZOOM_CLIENT_SECRET)
+        data = {
+            "grant_type": "refresh_token",
+            "refresh_token": oauth_token.refresh_token
+        }
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+
+        resp = requests.post(refresh_url, data=data, headers=headers, auth=auth)
+        if resp.status_code != 200:
+            return False
+
+        token_data = resp.json()
+        oauth_token.access_token = token_data["access_token"]
+        oauth_token.refresh_token = token_data["refresh_token"]
+        oauth_token.expires_at = timezone.now() + timezone.timedelta(seconds=token_data["expires_in"])
+        oauth_token.save()
+        return True
+
 
 class MeetingListView(ListView):
     model = Meeting
@@ -201,6 +266,7 @@ class MeetingListView(ListView):
                     'recording_id': rec.recording_id,
                     'play_url': rec.play_url,
                     'download_url': rec.download_url,
+                    'file_type': rec.file_type,
                     'recording_start': rec.recording_start,
                     'recording_end': rec.recording_end,
                 })
