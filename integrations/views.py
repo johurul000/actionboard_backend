@@ -106,7 +106,7 @@ class ZoomOAuthCallbackView(APIView):
         zoom_account_id = zoom_user_data.get("account_id", "")
 
         ZoomProfile.objects.update_or_create(
-            zoom_user_id=zoom_user_id,
+            user=user,
             defaults={
                 "oauth_token": oauth_token,
                 "zoom_user_id": zoom_user_id,
