@@ -285,6 +285,11 @@ ZOOM_CLIENT_ID = env("ZOOM_CLIENT_ID", default="")
 ZOOM_CLIENT_SECRET = env("ZOOM_CLIENT_SECRET", default="")
 
 
-# Backend Url
+# Live
+BACKEND_URL = "https://actionboard-backend-cdqe.onrender.com"
+FRONTEND_URL = "http://localhost:3000"
 
-BACKEND_URL = "http://localhost:8000"
+
+# Local
+# BACKEND_URL = "http://localhost:8000"
+# FRONTEND_URL = "http://localhost:3000"

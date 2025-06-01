@@ -23,7 +23,7 @@ class ZoomOAuthStartView(APIView):
 
         state_data = f"{user_id}:{random_state}" 
 
-        redirect_uri = "https://actionboard-backend-cdqe.onrender.com/api/integrations/zoom/oauth/callback/"
+        redirect_uri = f"{settings.BACKEND_URL}/api/integrations/zoom/oauth/callback/"
         client_id = settings.ZOOM_CLIENT_ID
 
         query_params = {
@@ -115,7 +115,7 @@ class ZoomOAuthCallbackView(APIView):
             },
         )
 
-        return redirect("http://localhost:3000/zoom-integration/success")
+        return redirect(f"{settings.FRONTEND_URL}/zoom-integration/success")
 
     def redirect_with_error(self, reason):
-        return redirect(f"http://localhost:3000/zoom-integration/error?reason={reason}")
+        return redirect(f"{settings.FRONTEND_URL}/zoom-integration/error?reason={reason}")

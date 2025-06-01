@@ -17,6 +17,8 @@ from .models import CustomUser
 from dj_rest_auth.serializers import JWTSerializer
 from django.utils import timezone
 from datetime import timedelta
+from django.conf import settings
+
 
 User = get_user_model()
 
@@ -118,7 +120,7 @@ class SignInView(APIView):
 
 class GoogleLogin(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
-    callback_url = "http://localhost:3000/"
+    callback_url = f"{settings.FRONTEND_URL}"
     client_class = OAuth2Client
 
     def post(self, request, *args, **kwargs):
