@@ -245,44 +245,54 @@ class ZoomWebhookView(View):
         return True
 
 
-class MeetingListView(ListView):
-    model = Meeting
-    context_object_name = 'meetings'
-    template_name = 'meetings/meeting_list.html'  # You can also return JSON if needed
+class MeetingListView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        org_id = self.kwargs.get('org_id')
-        # If Organisation ID is numeric primary key
-        organisation = get_object_or_404(Organisation, org_id=org_id)
-        return Meeting.objects.filter(organisation=organisation).prefetch_related('recordings')
-    
-    def render_to_response(self, context, **response_kwargs):
-        # Example: return JSON instead of template
-        meetings_data = []
-        for meeting in context['meetings']:
-            recordings_data = []
-            for rec in meeting.recordings.all():
-                recordings_data.append({
-                    'recording_id': rec.recording_id,
-                    'play_url': rec.play_url,
-                    'download_url': rec.download_url,
-                    'file_type': rec.file_type,
-                    'recording_start': rec.recording_start,
-                    'recording_end': rec.recording_end,
+    def get(self, request, org_id):
+        try:
+            # Get the organization
+            organisation = get_object_or_404(Organisation, org_id=org_id)
+            
+            # Get meetings for this organization
+            meetings = Meeting.objects.filter(organisation=organisation).prefetch_related('recordings')
+            
+            # Format meetings data for frontend
+            meetings_data = []
+            for meeting in meetings:
+                # Format recordings
+                recordings_data = []
+                for rec in meeting.recordings.all():
+                    recordings_data.append({
+                        'id': rec.recording_id,
+                        'play_url': rec.play_url,
+                        'download_url': rec.download_url,
+                        'file_type': rec.file_type,
+                        'recording_start': rec.recording_start,
+                        'recording_end': rec.recording_end,
+                    })
+
+                # Format meeting data to match frontend expectations
+                meetings_data.append({
+                    'id': meeting.meeting_id,  # Use meeting_id as the ID
+                    'topic': meeting.topic,
+                    'start_time': meeting.start_time.isoformat() if meeting.start_time else None,
+                    'duration': meeting.duration,
+                    'status': meeting.status or 'scheduled',
+                    'join_url': meeting.join_url,
+                    'agenda': getattr(meeting, 'agenda', ''),  # Add if you have this field
+                    'source': 'Zoom',  # Add source field
+                    'recordings': recordings_data,
                 })
 
-            meetings_data.append({
-                'meeting_id': meeting.meeting_id,
-                'topic': meeting.topic,
-                'start_time': meeting.start_time,
-                'end_time': meeting.end_time,
-                'status': meeting.status,
-                'recording_ready': meeting.recording_ready,
-                'video_url': meeting.video_url,
-                'recordings': recordings_data,
+            return Response({
+                'meetings': meetings_data,
+                'total': len(meetings_data)
             })
-
-        return JsonResponse({'meetings': meetings_data})
+            
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=500)
 
 # @method_decorator(csrf_exempt, name='dispatch')
 # class ZoomWebhookView(View):
