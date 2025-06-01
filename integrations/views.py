@@ -134,3 +134,37 @@ class ZoomOAuthCallbackView(APIView):
         return redirect(f"{settings.FRONTEND_URL}/zoom-integration/error?reason={reason}")
 
 
+class ZoomConnectionStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            zoom_profile = ZoomProfile.objects.get(user=request.user)
+            oauth_token = zoom_profile.oauth_token
+            
+            is_expired = oauth_token.expires_at < timezone.now() if oauth_token.expires_at else False
+            
+            return Response({
+                "is_connected": True,
+                "user_info": {
+                    "email": zoom_profile.zoom_email,
+                    "zoom_user_id": zoom_profile.zoom_user_id,
+                    "account_id": zoom_profile.zoom_account_id,
+                    "first_name": zoom_profile.zoom_email.split('@')[0] if zoom_profile.zoom_email else None,
+                },
+                "token_expiry": oauth_token.expires_at.isoformat() if oauth_token.expires_at else None,
+                "is_token_expired": is_expired,
+            })
+        except ZoomProfile.DoesNotExist:
+            return Response({
+                "is_connected": False,
+                "user_info": None,
+                "token_expiry": None,
+                "is_token_expired": False,
+            })
+        except Exception as e:
+            return Response({
+                "error": str(e)
+            }, status=500)
+
+
