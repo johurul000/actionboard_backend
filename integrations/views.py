@@ -128,7 +128,7 @@ class ZoomOAuthCallbackView(APIView):
             },
         )
         
-        return redirect(f"{settings.FRONTEND_URL}/zoom-integration/success")
+        return redirect(f"{settings.FRONTEND_URL}")
     
     def redirect_with_error(self, reason):
         return redirect(f"{settings.FRONTEND_URL}/zoom-integration/error?reason={reason}")
