@@ -48,11 +48,8 @@ class ZoomOAuthCallbackView(APIView):
         if not code or not state:
             return self.redirect_with_error("missing_code_or_state")
         
-        print(f"DEBUG: Received state: {state}")
-        
         try:
             user_id, random_state = state.split(":")
-            print(f"DEBUG: Parsed user_id: '{user_id}'")
         except ValueError:
             return self.redirect_with_error("invalid_state_format")
         
@@ -80,15 +77,10 @@ class ZoomOAuthCallbackView(APIView):
         
         try:
             user = CustomUser.objects.get(id=int(user_id))
-            print(f"DEBUG: Found user: {user} (id: {user.id})")
-        except CustomUser.DoesNotExist:
-            print(f"DEBUG: User not found with id: {user_id}")
+        except (CustomUser.DoesNotExist, ValueError):
             return self.redirect_with_error("invalid_user_id")
-        except ValueError:
-            print(f"DEBUG: Invalid user_id format: {user_id}")
-            return self.redirect_with_error("invalid_user_id_format")
         
-        # Fixed the syntax error here
+        # Create or update OAuth token
         oauth_token, _ = OAuthToken.objects.update_or_create(
             user=user,
             provider="zoom",
@@ -99,12 +91,9 @@ class ZoomOAuthCallbackView(APIView):
             },
         )
         
-        print(f"DEBUG: Created/updated oauth_token: {oauth_token}")
-        
+        # Get user info from Zoom
         user_info_url = "https://api.zoom.us/v2/users/me"
-        user_info_headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
+        user_info_headers = {"Authorization": f"Bearer {access_token}"}
         
         user_info_resp = requests.get(user_info_url, headers=user_info_headers)
         if user_info_resp.status_code != 200:
@@ -115,32 +104,29 @@ class ZoomOAuthCallbackView(APIView):
         zoom_email = zoom_user_data["email"]
         zoom_account_id = zoom_user_data.get("account_id", "")
         
-        print(f"DEBUG: About to create ZoomProfile for user: {user}")
-        print(f"DEBUG: oauth_token: {oauth_token}")
-        
+        # Create or update ZoomProfile using oauth_token as lookup
         ZoomProfile.objects.update_or_create(
-            user=user,
+            oauth_token=oauth_token,  # Use oauth_token as lookup instead of user
             defaults={
-                "oauth_token": oauth_token,
+                "user": user,  # Move user to defaults
                 "zoom_user_id": zoom_user_id,
                 "zoom_email": zoom_email,
                 "zoom_account_id": zoom_account_id,
             },
         )
         
-        return redirect(f"{settings.FRONTEND_URL}")
+        return redirect(f"{settings.FRONTEND_URL}?zoom_connected=true")
     
     def redirect_with_error(self, reason):
         return redirect(f"{settings.FRONTEND_URL}/zoom-integration/error?reason={reason}")
-
 
 class ZoomConnectionStatusView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
         try:
-            zoom_profile = ZoomProfile.objects.get(user=request.user)
-            oauth_token = zoom_profile.oauth_token
+            oauth_token = OAuthToken.objects.get(user=request.user, provider="zoom")
+            zoom_profile = ZoomProfile.objects.get(oauth_token=oauth_token)
             
             is_expired = oauth_token.expires_at < timezone.now() if oauth_token.expires_at else False
             
@@ -155,7 +141,7 @@ class ZoomConnectionStatusView(APIView):
                 "token_expiry": oauth_token.expires_at.isoformat() if oauth_token.expires_at else None,
                 "is_token_expired": is_expired,
             })
-        except ZoomProfile.DoesNotExist:
+        except (OAuthToken.DoesNotExist, ZoomProfile.DoesNotExist):
             return Response({
                 "is_connected": False,
                 "user_info": None,
@@ -166,5 +152,3 @@ class ZoomConnectionStatusView(APIView):
             return Response({
                 "error": str(e)
             }, status=500)
-
-
