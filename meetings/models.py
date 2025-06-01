@@ -44,3 +44,24 @@ class MeetingAttendee(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.meeting.title}"
+    
+
+class Recording(models.Model):
+    meeting = models.ForeignKey('meetings.Meeting', on_delete=models.CASCADE, related_name='recordings')
+    
+    recording_id = models.CharField(max_length=255, unique=True)
+    recording_type = models.CharField(max_length=100, blank=True, null=True)
+    file_type = models.CharField(max_length=50, blank=True, null=True)
+    file_size = models.BigIntegerField(null=True, blank=True)  # In bytes
+    
+    play_url = models.URLField(max_length=1000, blank=True, null=True)
+    download_url = models.URLField(max_length=1000, blank=True, null=True)
+    
+    recording_start = models.DateTimeField(null=True, blank=True)
+    recording_end = models.DateTimeField(null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Recording {self.recording_id} for {self.meeting.topic}"

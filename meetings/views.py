@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework import generics
 from integrations.models import OAuthToken, ZoomProfile
 from integrations.zoom_client import ZoomAPIClient
-from meetings.models import Meeting
+from meetings.models import Meeting, Recording
 from meetings.serializers import MeetingSerializer
 from organisations.models import Organisation
 from rest_framework import status
@@ -19,6 +19,8 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
+from django.views.generic import ListView
+
 
 class CreateZoomMeetingView(APIView):
     permission_classes = [IsAuthenticated]
@@ -125,33 +127,129 @@ class ZoomWebhookView(View):
 
     def post(self, request):
         data = json.loads(request.body)
+        print("==== Received webhook data ====")
+        print(json.dumps(data, indent=2))  # Pretty-print JSON for readability!
+
         event = data.get("event")
+        print(f"==== Event: {event} ====")
 
         if event == "meeting.ended":
             meeting_id = data["payload"]["object"]["id"]
+            print(f"==== Meeting Ended ID: {meeting_id} ====")
+
             meeting = Meeting.objects.filter(meeting_id=str(meeting_id)).first()
             if meeting:
                 meeting.status = "ended"
                 meeting.end_time = parse_datetime(data["payload"]["object"]["end_time"])
                 meeting.save()
+                print(f"==== Updated Meeting {meeting_id} as ended ====")
 
         elif event == "recording.completed":
             meeting_id = data["payload"]["object"]["id"]
             recording_files = data["payload"]["object"]["recording_files"]
             meeting = Meeting.objects.filter(meeting_id=str(meeting_id)).first()
             if meeting and recording_files:
-                # Example: save first recording URL
-                meeting.video_url = recording_files[0]["download_url"]
+                for rec in recording_files:
+                    recording_id = rec.get("id")
+                    recording, created = Recording.objects.get_or_create(
+                        recording_id=recording_id,
+                        defaults={
+                            "meeting": meeting,
+                            "recording_type": rec.get("recording_type"),
+                            "file_type": rec.get("file_type"),
+                            "file_size": rec.get("file_size"),
+                            "play_url": rec.get("play_url"),
+                            "download_url": rec.get("download_url"),
+                            "recording_start": parse_datetime(rec.get("recording_start")),
+                            "recording_end": parse_datetime(rec.get("recording_end")),
+                        }
+                    )
+                    if not created:
+                        # Update fields if already exists
+                        recording.play_url = rec.get("play_url")
+                        recording.download_url = rec.get("download_url")
+                        recording.recording_start = parse_datetime(rec.get("recording_start"))
+                        recording.recording_end = parse_datetime(rec.get("recording_end"))
+                        recording.save()
+                # Mark that recording is ready
                 meeting.recording_ready = True
-                # Update end_time again if you want, usually already set
-                meeting.end_time = parse_datetime(data["payload"]["object"]["end_time"])
                 meeting.save()
 
         return JsonResponse({"status": "received"})
-    
 
     def get(self, request, *args, **kwargs):
         return JsonResponse({"error": "GET method not allowed"}, status=405)
+
+class MeetingListView(ListView):
+    model = Meeting
+    context_object_name = 'meetings'
+    template_name = 'meetings/meeting_list.html'  # You can also return JSON if needed
+
+    def get_queryset(self):
+        org_id = self.kwargs.get('org_id')
+        # If Organisation ID is numeric primary key
+        organisation = get_object_or_404(Organisation, org_id=org_id)
+        return Meeting.objects.filter(organisation=organisation).prefetch_related('recordings')
+    
+    def render_to_response(self, context, **response_kwargs):
+        # Example: return JSON instead of template
+        meetings_data = []
+        for meeting in context['meetings']:
+            recordings_data = []
+            for rec in meeting.recordings.all():
+                recordings_data.append({
+                    'recording_id': rec.recording_id,
+                    'play_url': rec.play_url,
+                    'download_url': rec.download_url,
+                    'recording_start': rec.recording_start,
+                    'recording_end': rec.recording_end,
+                })
+
+            meetings_data.append({
+                'meeting_id': meeting.meeting_id,
+                'topic': meeting.topic,
+                'start_time': meeting.start_time,
+                'end_time': meeting.end_time,
+                'status': meeting.status,
+                'recording_ready': meeting.recording_ready,
+                'video_url': meeting.video_url,
+                'recordings': recordings_data,
+            })
+
+        return JsonResponse({'meetings': meetings_data})
+
+# @method_decorator(csrf_exempt, name='dispatch')
+# class ZoomWebhookView(View):
+
+#     def post(self, request):
+#         data = json.loads(request.body)
+#         event = data.get("event")
+
+#         if event == "meeting.ended":
+#             meeting_id = data["payload"]["object"]["id"]
+#             meeting = Meeting.objects.filter(meeting_id=str(meeting_id)).first()
+#             if meeting:
+#                 meeting.status = "ended"
+#                 meeting.end_time = parse_datetime(data["payload"]["object"]["end_time"])
+#                 meeting.save()
+
+#         elif event == "recording.completed":
+#             meeting_id = data["payload"]["object"]["id"]
+#             recording_files = data["payload"]["object"]["recording_files"]
+#             meeting = Meeting.objects.filter(meeting_id=str(meeting_id)).first()
+#             if meeting and recording_files:
+#                 # Example: save first recording URL
+#                 meeting.video_url = recording_files[0]["download_url"]
+#                 meeting.recording_ready = True
+#                 # Update end_time again if you want, usually already set
+#                 meeting.end_time = parse_datetime(data["payload"]["object"]["end_time"])
+#                 meeting.save()
+
+#         return JsonResponse({"status": "received"})
+    
+
+#     def get(self, request, *args, **kwargs):
+#         return JsonResponse({"error": "GET method not allowed"}, status=405)
 
 
 

@@ -269,6 +269,13 @@ AUTH_USER_MODEL = 'users.CustomUser'
 
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://58c4-2409-408c-9411-6c3-1b4a-d261-2a4e-5129.ngrok-free.app',
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
+    'https://actionboard-backend-cdqe.onrender.com'
+
+]
 
 # ZOOM
 # ZOOM_CLIENT_ID = config('ZOOM_CLIENT_ID', '')
