@@ -38,7 +38,7 @@ class ZoomOAuthStartView(APIView):
         return Response({"authorize_url": authorize_url})
     
 
-
+#BY Azizr Rahman
 class ZoomOAuthCallbackView(APIView):
     permission_classes = [AllowAny]
     def get(self, request):
@@ -120,6 +120,7 @@ class ZoomOAuthCallbackView(APIView):
     def redirect_with_error(self, reason):
         return redirect(f"{settings.FRONTEND_URL}/zoom-integration/error?reason={reason}")
 
+#BY Azizr Rahman
 class ZoomConnectionStatusView(APIView):
     permission_classes = [IsAuthenticated]
     
@@ -151,4 +152,51 @@ class ZoomConnectionStatusView(APIView):
         except Exception as e:
             return Response({
                 "error": str(e)
+            }, status=500)
+
+
+#BY Azizr Rahman
+class ZoomDisconnectView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            # Get the user's Zoom profile
+            zoom_profile = ZoomProfile.objects.get(user=request.user)
+            oauth_token = zoom_profile.oauth_token
+            
+            # Optional: Revoke the token with Zoom (recommended)
+            try:
+                revoke_url = "https://zoom.us/oauth/revoke"
+                revoke_data = {
+                    "token": oauth_token.access_token
+                }
+                revoke_headers = {
+                    "Authorization": f"Basic {settings.ZOOM_CLIENT_ID}:{settings.ZOOM_CLIENT_SECRET}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+                
+                # Try to revoke the token, but don't fail if it doesn't work
+                requests.post(revoke_url, data=revoke_data, headers=revoke_headers)
+            except Exception as e:
+                print(f"Warning: Could not revoke Zoom token: {e}")
+            
+            # Delete the ZoomProfile and OAuth token
+            zoom_profile.delete()  # This will cascade delete the oauth_token due to OneToOneField
+            
+            return Response({
+                "success": True,
+                "message": "Successfully disconnected from Zoom"
+            })
+            
+        except ZoomProfile.DoesNotExist:
+            return Response({
+                "success": False,
+                "message": "No Zoom connection found"
+            }, status=404)
+            
+        except Exception as e:
+            return Response({
+                "success": False,
+                "message": f"Error disconnecting from Zoom: {str(e)}"
             }, status=500)
