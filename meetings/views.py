@@ -361,6 +361,40 @@ class MeetingDetailsView(APIView):
                 else:
                     calculated_status = 'scheduled'
 
+            # Format host data based on your CustomUser model
+            host_data = None
+            if meeting.host:
+                # Create full name from first_name and last_name
+                full_name = ""
+                if meeting.host.first_name and meeting.host.last_name:
+                    full_name = f"{meeting.host.first_name} {meeting.host.last_name}".strip()
+                elif meeting.host.first_name:
+                    full_name = meeting.host.first_name
+                elif meeting.host.last_name:
+                    full_name = meeting.host.last_name
+                
+                host_data = {
+                    'id': meeting.host.id,
+                    'email': meeting.host.email,
+                    'first_name': meeting.host.first_name or '',
+                    'last_name': meeting.host.last_name or '',
+                    'full_name': full_name,
+                    'country': str(meeting.host.country) if meeting.host.country else None,
+                }
+
+            # Format organisation data safely
+            organisation_data = None
+            if meeting.organisation:
+                organisation_data = {
+                    'id': meeting.organisation.id,
+                }
+                
+                # Add name/org_id fields if they exist
+                if hasattr(meeting.organisation, 'name'):
+                    organisation_data['name'] = meeting.organisation.name
+                if hasattr(meeting.organisation, 'org_id'):
+                    organisation_data['org_id'] = meeting.organisation.org_id
+
             # Format meeting data to match your model
             meeting_data = {
                 'id': meeting.id,
@@ -373,16 +407,8 @@ class MeetingDetailsView(APIView):
                 'join_url': meeting.join_url,
                 'start_url': meeting.start_url,
                 'video_url': meeting.video_url,  # From your model
-                'host': {
-                    'id': meeting.host.id,
-                    'username': meeting.host.username,
-                    'email': meeting.host.email,
-                } if meeting.host else None,
-                'organisation': {
-                    'id': meeting.organisation.id,
-                    'name': meeting.organisation.name,
-                    'org_id': meeting.organisation.org_id,
-                } if meeting.organisation else None,
+                'host': host_data,
+                'organisation': organisation_data,
                 'recording_ready': meeting.recording_ready,
                 'recordings': recordings_data,
                 'transcript': transcript_data,
