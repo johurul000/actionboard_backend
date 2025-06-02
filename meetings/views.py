@@ -294,6 +294,103 @@ class MeetingListView(APIView):
                 'error': str(e)
             }, status=500)
 
+
+
+class MeetingDetailsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, meeting_id):
+        try:
+            # Get the meeting by meeting_id
+            meeting = get_object_or_404(Meeting, meeting_id=meeting_id)
+            
+            # Check if user has access to this meeting (through organization)
+            if not meeting.organisation.members.filter(id=request.user.id).exists():
+                return Response({"error": "Access denied"}, status=403)
+            
+            # Get recordings for this meeting
+            recordings_data = []
+            for rec in meeting.recordings.all():
+                recordings_data.append({
+                    'id': rec.recording_id,
+                    'play_url': rec.play_url,
+                    'download_url': rec.download_url,
+                    'file_type': rec.file_type,
+                    'recording_type': rec.recording_type,
+                    'file_size': rec.file_size,
+                    'recording_start': rec.recording_start.isoformat() if rec.recording_start else None,
+                    'recording_end': rec.recording_end.isoformat() if rec.recording_end else None,
+                })
+
+            # Get transcript if exists
+            transcript_data = None
+            try:
+                transcript = Transcript.objects.get(meeting=meeting)
+                transcript_data = {
+                    'full_transcript': transcript.full_transcript,
+                    'summary': transcript.summary,
+                    'language': transcript.language,
+                    'created_at': transcript.created_at.isoformat() if hasattr(transcript, 'created_at') else None,
+                }
+            except Transcript.DoesNotExist:
+                pass
+
+            # Calculate meeting status based on times if status is 'active'
+            calculated_status = meeting.status
+            if meeting.status == 'active' and meeting.start_time:
+                from django.utils import timezone
+                now = timezone.now()
+                
+                if meeting.end_time and now > meeting.end_time:
+                    calculated_status = 'ended'
+                elif now >= meeting.start_time:
+                    if meeting.duration:
+                        estimated_end = meeting.start_time + timezone.timedelta(minutes=meeting.duration)
+                        if now > estimated_end:
+                            calculated_status = 'ended'
+                        else:
+                            calculated_status = 'started'
+                    else:
+                        calculated_status = 'started'
+                else:
+                    calculated_status = 'scheduled'
+
+            # Format meeting data to match your model
+            meeting_data = {
+                'id': meeting.id,
+                'meeting_id': meeting.meeting_id,
+                'topic': meeting.topic,
+                'start_time': meeting.start_time.isoformat() if meeting.start_time else None,
+                'end_time': meeting.end_time.isoformat() if meeting.end_time else None,
+                'duration': meeting.duration,
+                'status': calculated_status,  # Use calculated status
+                'join_url': meeting.join_url,
+                'start_url': meeting.start_url,
+                'video_url': meeting.video_url,  # From your model
+                'host': {
+                    'id': meeting.host.id,
+                    'username': meeting.host.username,
+                    'email': meeting.host.email,
+                } if meeting.host else None,
+                'organisation': {
+                    'id': meeting.organisation.id,
+                    'name': meeting.organisation.name,
+                    'org_id': meeting.organisation.org_id,
+                } if meeting.organisation else None,
+                'recording_ready': meeting.recording_ready,
+                'recordings': recordings_data,
+                'transcript': transcript_data,
+                'created_at': meeting.created_at.isoformat(),
+                'updated_at': meeting.updated_at.isoformat(),
+            }
+
+            return Response(meeting_data)
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to retrieve meeting details: {str(e)}'
+            }, status=500)
+
 # @method_decorator(csrf_exempt, name='dispatch')
 # class ZoomWebhookView(View):
 
