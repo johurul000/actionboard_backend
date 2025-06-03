@@ -10,7 +10,7 @@ class Organisation(models.Model):
     org_id = models.CharField(max_length=8, unique=True, editable=False)
     created_by = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, related_name='created_organisations')
     created_at = models.DateTimeField(auto_now_add=True)
-
+    
     def __str__(self):
         return self.name
 

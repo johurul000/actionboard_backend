@@ -33,7 +33,7 @@ def transcribe_recording_with_secure_url(meeting_id, user):
         if not refresh_zoom_token(oauth_token):
             raise Exception("Failed to refresh Zoom token")
 
-    # 2️⃣ Fetch fresh download URL from Zoom API
+ 
     recordings_resp = requests.get(
         f"https://api.zoom.us/v2/meetings/{meeting_id}/recordings",
         headers={"Authorization": f"Bearer {oauth_token.access_token}"}
@@ -41,7 +41,6 @@ def transcribe_recording_with_secure_url(meeting_id, user):
     recordings_resp.raise_for_status()
     recordings_data = recordings_resp.json()
 
-    # 3️⃣ Find the audio recording file
     audio_file = next(
         (f for f in recordings_data.get('recording_files', [])
          if f['file_type'] == 'M4A'),
@@ -50,23 +49,35 @@ def transcribe_recording_with_secure_url(meeting_id, user):
     if not audio_file:
         raise Exception("No audio recording found for this meeting.")
 
-    # 4️⃣ Construct download URL with access_token
+
     download_url = f"{audio_file['download_url']}?access_token={oauth_token.access_token}"
 
-    # 5️⃣ Download audio file
+
     local_audio_file = 'audio_file.m4a'
     download_audio_to_file(download_url, local_audio_file)
 
-    # 6️⃣ Upload to AssemblyAI
+
     assemblyai_audio_url = upload_audio_file_to_assemblyai(local_audio_file)
 
-    # 7️⃣ Transcribe & summarize
-    transcript_text, summary = transcribe_with_assembly_ai(assemblyai_audio_url)
 
-    # 8️⃣ Cleanup
+    transcript_text, summary, utterances = transcribe_with_assembly_ai(assemblyai_audio_url)
+
+
+
     os.remove(local_audio_file)
 
-    return transcript_text, summary
+    return transcript_text, {
+        "summary_text": summary,
+        "utterances": [
+            {
+                "speaker": u["speaker"],
+                "start": round(u["start"] / 1000, 2),
+                "end": round(u["end"] / 1000, 2),
+                "text": u["text"]
+            }
+            for u in utterances
+        ]
+    }
 
 
 def download_audio_to_file(audio_url, output_file):
@@ -92,35 +103,102 @@ def upload_audio_file_to_assemblyai(file_path):
 
 def transcribe_with_assembly_ai(audio_url, poll_interval=5, timeout=600):
     """
-    Transcribe audio URL with AssemblyAI SDK and get both transcript and summary.
+    Transcribes audio from AssemblyAI using both:
+    - REST API: to get diarized utterances
+    - SDK: to get transcript text + summary
+    Returns: (full_text, summary_text, utterances_list)
     """
-    # Configure transcription with summarization
+    import requests
+
+    # REST API: Start transcription with speaker labels
+    headers = {"authorization": ASSEMBLYAI_API_KEY}
+    start_resp = requests.post(
+        f"{ASSEMBLYAI_ENDPOINT}/transcript",
+        headers=headers,
+        json={
+            "audio_url": audio_url,
+            "speaker_labels": True
+        }
+    )
+    start_resp.raise_for_status()
+    transcript_id = start_resp.json()['id']
+
+    # Polling loop
+    total_wait = 0
+    while total_wait < timeout:
+        poll_resp = requests.get(
+            f"{ASSEMBLYAI_ENDPOINT}/transcript/{transcript_id}",
+            headers=headers
+        )
+        poll_resp.raise_for_status()
+        data = poll_resp.json()
+        if data['status'] == 'completed':
+            diarized_utterances = data.get('utterances', [])
+            full_text = data.get('text', '')
+            break
+        elif data['status'] == 'error':
+            raise Exception(f"AssemblyAI transcription error: {data.get('error')}")
+        time.sleep(poll_interval)
+        total_wait += poll_interval
+    else:
+        raise TimeoutError("AssemblyAI REST transcription timed out")
+
+    # SDK: Fetch summary separately using same audio_url
     config = aai.TranscriptionConfig(
         summarization=True,
-        summary_model=aai.SummarizationModel.informative,  # or 'conversational'
-        summary_type=aai.SummarizationType.bullets          # or 'paragraph', 'headline'
+        summary_model=aai.SummarizationModel.informative,
+        summary_type=aai.SummarizationType.bullets
     )
-    
     transcriber = aai.Transcriber()
-    
-    # Start transcription (using public URL)
-    transcript = transcriber.transcribe(audio_url, config=config)
-    
-    # Wait for completion (polling)
+    summary_transcript = transcriber.transcribe(audio_url, config=config)
+
+    # Poll for summary
     total_wait = 0
-    while transcript.status not in ['completed', 'error']:
+    while summary_transcript.status not in ['completed', 'error']:
         if total_wait > timeout:
-            raise TimeoutError("AssemblyAI transcription timed out")
+            raise TimeoutError("AssemblyAI SDK transcription timed out")
         time.sleep(poll_interval)
-        transcript.refresh()  # refresh the status
+        summary_transcript.refresh()
         total_wait += poll_interval
+
+    if summary_transcript.status == 'error':
+        raise Exception(f"AssemblyAI summary transcription error: {summary_transcript.error}")
+
+    return full_text, summary_transcript.summary, diarized_utterances
+
+
+
+# def transcribe_with_assembly_ai(audio_url, poll_interval=5, timeout=600):
+#     """
+#     Transcribe audio URL with AssemblyAI SDK and get both transcript and summary.
+#     """
+#     # Configure transcription with summarization
+#     config = aai.TranscriptionConfig(
+#         summarization=True,
+#         summary_model=aai.SummarizationModel.informative,  # or 'conversational'
+#         summary_type=aai.SummarizationType.bullets          # or 'paragraph', 'headline'
+#     )
     
-    if transcript.status == 'error':
-        raise Exception(f"AssemblyAI transcription error: {transcript.error}")
+#     transcriber = aai.Transcriber()
     
-    # transcript.text -> full transcript text
-    # transcript.summary -> summary string (bullets or paragraph depending on config)
-    return transcript.text, transcript.summary
+#     # Start transcription (using public URL)
+#     transcript = transcriber.transcribe(audio_url, config=config)
+    
+#     # Wait for completion (polling)
+#     total_wait = 0
+#     while transcript.status not in ['completed', 'error']:
+#         if total_wait > timeout:
+#             raise TimeoutError("AssemblyAI transcription timed out")
+#         time.sleep(poll_interval)
+#         transcript.refresh()  # refresh the status
+#         total_wait += poll_interval
+    
+#     if transcript.status == 'error':
+#         raise Exception(f"AssemblyAI transcription error: {transcript.error}")
+    
+#     # transcript.text -> full transcript text
+#     # transcript.summary -> summary string (bullets or paragraph depending on config)
+#     return transcript.text, transcript.summary
 
 
 # def transcribe_with_assembly_ai(audio_url, poll_interval=5, timeout=600):
