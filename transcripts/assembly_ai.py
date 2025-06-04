@@ -7,6 +7,8 @@ from rest_framework.response import Response
 from django.conf import settings
 import assemblyai as aai
 
+from meetings.models import Meeting
+
 
 ASSEMBLYAI_API_KEY = "b9d094c60c6a4aa78fd4d54feadc7d73"
 ASSEMBLYAI_ENDPOINT = "https://api.assemblyai.com/v2"
@@ -23,15 +25,20 @@ def transcribe_recording_with_secure_url(meeting_id, user):
     Downloads fresh Zoom audio recording, uploads to AssemblyAI for transcription,
     and returns (transcript_text, summary).
     """
-    # 1️⃣ Get Zoom OAuth token for the user
-    try:
-        oauth_token = OAuthToken.objects.get(user=user, provider='zoom')
-    except OAuthToken.DoesNotExist:
-        raise Exception("Zoom OAuth token not found for user.")
+    meeting = Meeting.objects.get(meeting_id=meeting_id)
 
-    if oauth_token.expires_at <= timezone.now():
-        if not refresh_zoom_token(oauth_token):
-            raise Exception("Failed to refresh Zoom token")
+
+    organisation = meeting.organisation
+    if not organisation:
+        raise Exception("Meeting not linked to an organisation.")
+
+    try:
+        oauth_token = OAuthToken.objects.get(
+            organisation=organisation,
+            provider="zoom"
+        )
+    except OAuthToken.DoesNotExist:
+        raise Exception("Zoom OAuth token not found for this organisation.")
 
  
     recordings_resp = requests.get(

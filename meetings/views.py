@@ -45,7 +45,7 @@ class CreateZoomMeetingView(APIView):
 
         # Check OAuth token
         try:
-            oauth_token = OAuthToken.objects.get(user=request.user, provider="zoom")
+            oauth_token = OAuthToken.objects.get(organisation=organisation, provider="zoom")
         except OAuthToken.DoesNotExist:
             return Response({"error": "Zoom not connected"}, status=400)
 
@@ -211,11 +211,12 @@ class ZoomWebhookView(View):
         Helper to get a valid Zoom OAuth token for the meeting's host.
         Refreshes if expired.
         """
-        host = meeting.host
-        if not host:
+        organisation = meeting.organisation
+        if not organisation:
             return None
+
         try:
-            oauth_token = OAuthToken.objects.get(user=host, provider="zoom")
+            oauth_token = OAuthToken.objects.get(organisation=organisation, provider="zoom")
         except OAuthToken.DoesNotExist:
             return None
 

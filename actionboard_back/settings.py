@@ -270,7 +270,7 @@ AUTH_USER_MODEL = 'users.CustomUser'
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://58c4-2409-408c-9411-6c3-1b4a-d261-2a4e-5129.ngrok-free.app',
+    'https://acd6-2409-408c-940a-3cf-761a-61f-7f1-8d9f.ngrok-free.app',
     'http://127.0.0.1:8000',
     'http://localhost:8000',
     'https://actionboard-backend-cdqe.onrender.com'
@@ -288,10 +288,14 @@ ZOOM_CLIENT_SECRET = env("ZOOM_CLIENT_SECRET", default="")
 ASSEMBLYAI_API_KEY = env("ASSEMBLYAI_API_KEY", default="")
 
 # Live
-BACKEND_URL = "https://actionboard-backend-cdqe.onrender.com"
-FRONTEND_URL = "http://localhost:3000"
+# BACKEND_URL = "https://actionboard-backend-cdqe.onrender.com"
+# FRONTEND_URL = "http://localhost:3000"
 
 
 # Local
 # BACKEND_URL = "http://localhost:8000"
 # FRONTEND_URL = "http://localhost:3000"
+
+# Ngrok
+BACKEND_URL = "https://acd6-2409-408c-940a-3cf-761a-61f-7f1-8d9f.ngrok-free.app"
+FRONTEND_URL = "http://localhost:3000"
