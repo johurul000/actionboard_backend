@@ -273,7 +273,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://acd6-2409-408c-940a-3cf-761a-61f-7f1-8d9f.ngrok-free.app',
     'http://127.0.0.1:8000',
     'http://localhost:8000',
-    'https://actionboard-backend-cdqe.onrender.com'
+    'https://actionboard-backend-1.onrender.com'
 
 ]
 
@@ -288,8 +288,8 @@ ZOOM_CLIENT_SECRET = env("ZOOM_CLIENT_SECRET", default="")
 ASSEMBLYAI_API_KEY = env("ASSEMBLYAI_API_KEY", default="")
 
 # Live
-# BACKEND_URL = "https://actionboard-backend-cdqe.onrender.com"
-# FRONTEND_URL = "http://localhost:3000"
+BACKEND_URL = "https://actionboard-backend-1.onrender.com"
+FRONTEND_URL = "http://localhost:3000"
 
 
 # Local
@@ -297,5 +297,5 @@ ASSEMBLYAI_API_KEY = env("ASSEMBLYAI_API_KEY", default="")
 # FRONTEND_URL = "http://localhost:3000"
 
 # Ngrok
-BACKEND_URL = "https://acd6-2409-408c-940a-3cf-761a-61f-7f1-8d9f.ngrok-free.app"
-FRONTEND_URL = "http://localhost:3000"
+# BACKEND_URL = "https://acd6-2409-408c-940a-3cf-761a-61f-7f1-8d9f.ngrok-free.app"
+# FRONTEND_URL = "http://localhost:3000"
