@@ -228,9 +228,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'APP': {
-            'client_id': '68812465442-2q4tjran4vha31ijhph8grg0rehiqmk3.apps.googleusercontent.com',
+            'client_id': env('GOOGLE_OAUTH_CLIENT_ID', default=""),
             # 'secret': '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',
-            'secret': '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',
+            'secret': env('GOOGLE_OAUTH_SECRET', default=""),
             'key': ''
         },
         'SCOPE': ['profile', 'email'],
