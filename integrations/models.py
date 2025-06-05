@@ -8,6 +8,9 @@ class OAuthToken(models.Model):
         ('teams', 'Microsoft Teams'),
     )
 
+    user = models.ForeignKey('users.CustomUser',on_delete=models.SET_NULL, blank=True, null=True, related_name='oauth_tokens'
+)
+
     organisation = models.ForeignKey('organisations.Organisation', on_delete=models.CASCADE, related_name='oauth_tokens')
 
     provider = models.CharField(max_length=30, choices=PROVIDER_CHOICES)
@@ -25,8 +28,11 @@ class OAuthToken(models.Model):
 
     def __str__(self):
         return f"{self.organisation.name} - {self.provider}"
-    
+
+
+
 class ZoomProfile(models.Model):
+    user = models.ForeignKey('users.CustomUser', on_delete=models.SET_NULL, blank=True, null=True, related_name='zoom_profiles')
     organisation = models.ForeignKey('organisations.Organisation', on_delete=models.CASCADE, related_name='zoom_profiles')
     oauth_token = models.OneToOneField('integrations.OAuthToken', on_delete=models.CASCADE, related_name='zoom_profile')
 
@@ -40,7 +46,7 @@ class ZoomProfile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+
     def __str__(self):
         return f"{self.zoom_email} ({self.organisation.name})"
-
 

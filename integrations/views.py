@@ -109,6 +109,7 @@ class ZoomOAuthCallbackView(APIView):
         ).delete()
 
         oauth_token, _ = OAuthToken.objects.update_or_create(
+            user=user,
             organisation=organisation,
             provider="zoom",
             defaults={
@@ -128,6 +129,7 @@ class ZoomOAuthCallbackView(APIView):
         zoom_data = zoom_resp.json()
 
         ZoomProfile.objects.update_or_create(
+            user=user,
             organisation=organisation,
             defaults={
                 "oauth_token": oauth_token,
