@@ -32,7 +32,7 @@ class ZoomOAuthStartView(APIView):
             return Response({"error": "User not part of this organisation"}, status=403)
 
         state_data = f"{request.user.id}:{org_id}:{get_random_string(32)}"
-        redirect_uri = "https://actionboard-backend-cdqe.onrender.com/api/integrations/zoom/oauth/callback/"
+        redirect_uri = f"{settings.BACKEND_URL}/api/integrations/zoom/oauth/callback/"
 
         query_params = {
             "response_type": "code",
