@@ -5,11 +5,15 @@ class Transcript(models.Model):
     meeting = models.OneToOneField('meetings.Meeting', on_delete=models.CASCADE, related_name='transcript')
     full_transcript = models.TextField()
     summary = models.JSONField(help_text="Structured summary: attendees, decisions, action_items")
+    utterances = models.JSONField(blank=True, null=True, help_text="List of utterance blocks with speaker, time, text")
+    cohere_insights = models.JSONField(blank=True, null=True, help_text="Insights or output from Cohere AI")
     language = models.CharField(max_length=50, default='en')
     created_at = models.DateTimeField(auto_now_add=True)
+    speakers_updated = models.BooleanField(default=False)
+    speaker_map = models.JSONField(blank=True, null=True, help_text="Mapping of speaker codes to human names")
 
     def __str__(self):
-        return f"Transcript for {self.meeting.title}"
+        return f"Transcript for {self.meeting.topic}"
     
     
 class ActionItem(models.Model):

@@ -6,19 +6,22 @@ from django.utils import timezone
 from rest_framework.response import Response
 from django.conf import settings
 import assemblyai as aai
-
+import cohere
+from collections import defaultdict
+import re
 from meetings.models import Meeting
 
 
-ASSEMBLYAI_API_KEY = "b9d094c60c6a4aa78fd4d54feadc7d73"
 ASSEMBLYAI_ENDPOINT = "https://api.assemblyai.com/v2"
+
 
 headers = {
     "authorization": settings.ASSEMBLYAI_API_KEY,
     "content-type": "application/json"
 }
 
-aai.settings.api_key = ASSEMBLYAI_API_KEY
+aai.settings.api_key = settings.ASSEMBLYAI_API_KEY
+
 
 def transcribe_recording_with_secure_url(meeting_id, user):
     """
@@ -69,10 +72,12 @@ def transcribe_recording_with_secure_url(meeting_id, user):
 
     transcript_text, summary, utterances = transcribe_with_assembly_ai(assemblyai_audio_url)
 
-
-
     os.remove(local_audio_file)
 
+    cohere_insights = analyze_transcript_with_cohere(
+        utterances,
+        cohere_api_key=settings.COHERE_API_KEY  
+    )
     return transcript_text, {
         "summary_text": summary,
         "utterances": [
@@ -83,7 +88,84 @@ def transcribe_recording_with_secure_url(meeting_id, user):
                 "text": u["text"]
             }
             for u in utterances
-        ]
+        ],
+        "cohere_insights": cohere_insights
+    }
+
+
+def analyze_transcript_with_cohere(utterances, cohere_api_key, timeout=300, poll_interval=5):
+    """
+    Analyzes meeting utterances using Cohere:
+    - Generates a structured summary (agenda, minutes, action items)
+    - Generates individual speaker summaries
+    Returns: dict with structured_summary and speaker_summaries
+    """
+    co = cohere.Client(cohere_api_key)
+
+    # 1️⃣ Format utterance transcript
+    utterance_transcript = "\n".join(
+        f"Speaker {u['speaker']} | [{u['start'] / 1000}-{u['end'] / 1000}] {u['text']}"
+        for u in utterances
+    )
+
+    # 2️⃣ Structured Summary Prompt
+    prompt = f"""
+        You are an AI assistant that reads meeting transcripts and produces structured summaries.
+        Please read the transcript below and return:
+
+        1. Minutes of the Meeting  
+        2. Meeting Agenda  
+        3. Key Points  
+        4. Action Items
+
+        Format your output using section headers.
+
+        Transcript:
+        {utterance_transcript}
+    """
+
+    structured_summary_response = co.generate(
+        model="command-r-plus",
+        prompt=prompt,
+        max_tokens=1500,
+        temperature=0.3
+    )
+    structured_summary = structured_summary_response.generations[0].text.strip()
+
+    # print("=== UTTERANCE TRANSCRIPT ===")
+    # print(utterance_transcript)
+
+    # Extract per-speaker blocks
+    pattern = re.compile(r"^(Speaker [A-Z])\s+\|\s+\[\d+\.\d+-\d+\.\d+\]\s+(.*)$", re.MULTILINE)
+
+    speaker_texts = defaultdict(list)
+    for match in pattern.finditer(utterance_transcript):
+        speaker = match.group(1)
+        text = match.group(2).strip()
+        speaker_texts[speaker].append(text)
+    speaker_texts = {k: " ".join(v) for k, v in speaker_texts.items()}
+
+    # Generate speaker summaries
+    speaker_summaries = {}
+    for speaker, text in speaker_texts.items():
+        indiv_prompt = f"""You are an AI assistant. Summarize the following meeting contributions made by {speaker}.
+        Only summarize their individual contributions. Mention tasks, opinions, or explanations they provided.
+
+        Text:
+        {text}
+        """
+        resp = co.generate(
+            model="command",
+            prompt=indiv_prompt,
+            max_tokens=500,
+            temperature=0.3
+        )
+        speaker_summaries[speaker] = resp.generations[0].text.strip()
+
+    # Final output
+    return {
+        "structured_summary": structured_summary,
+        "speaker_summaries": speaker_summaries
     }
 
 
@@ -96,7 +178,7 @@ def download_audio_to_file(audio_url, output_file):
 
 
 def upload_audio_file_to_assemblyai(file_path):
-    headers = {"authorization": ASSEMBLYAI_API_KEY}
+    headers = {"authorization": settings.ASSEMBLYAI_API_KEY}
     with open(file_path, 'rb') as f:
         upload_resp = requests.post(
             f"{ASSEMBLYAI_ENDPOINT}/upload",
@@ -118,7 +200,7 @@ def transcribe_with_assembly_ai(audio_url, poll_interval=5, timeout=600):
     import requests
 
     # REST API: Start transcription with speaker labels
-    headers = {"authorization": ASSEMBLYAI_API_KEY}
+    headers = {"authorization": settings.ASSEMBLYAI_API_KEY}
     start_resp = requests.post(
         f"{ASSEMBLYAI_ENDPOINT}/transcript",
         headers=headers,

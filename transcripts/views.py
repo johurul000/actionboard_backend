@@ -6,6 +6,8 @@ import requests
 from rest_framework.permissions import IsAuthenticated
 from transcripts.assembly_ai import transcribe_recording_with_secure_url
 from transcripts.models import Transcript
+import re
+
 
 # Create your views here.
 class FetchTranscriptView(APIView):
@@ -15,16 +17,20 @@ class FetchTranscriptView(APIView):
         meeting = Meeting.objects.filter(meeting_id=meeting_id).first()
         if not meeting:
             return Response({"error": "Meeting not found"}, status=404)
-        
+
         if hasattr(meeting, "transcript"):
+            transcript = meeting.transcript
             transcript_data = {
-                "full_transcript": meeting.transcript.full_transcript,
-                "summary": meeting.transcript.summary,
-                "language": meeting.transcript.language,
+                "full_transcript": transcript.full_transcript,
+                "summary": transcript.summary,
+                "language": transcript.language,
+                "utterances": transcript.utterances if transcript.utterances else [],
+                "meeting_insights": transcript.cohere_insights if transcript.cohere_insights else {},
+                "speakers_updated": transcript.speakers_updated,
             }
             return Response(transcript_data, status=200)
-        else:
-            return Response({"transcript": None}, status=200)
+
+        return Response({"transcript": None}, status=200)
 
 
 class TranscribeRecordingView(APIView):
@@ -34,29 +40,134 @@ class TranscribeRecordingView(APIView):
         meeting = get_object_or_404(Meeting, meeting_id=meeting_id)
 
         try:
-            transcript_text, summary = transcribe_recording_with_secure_url(
+            transcript_text, assembly_data = transcribe_recording_with_secure_url(
                 meeting_id, request.user
             )
+
+            summary = assembly_data["summary_text"]
+            cohere_insights = assembly_data["cohere_insights"]
+            utterances = assembly_data["utterances"]
 
             transcript, created = Transcript.objects.get_or_create(
                 meeting=meeting,
                 defaults={
                     "full_transcript": transcript_text,
-                    "summary": summary
+                    "summary": summary,
+                    "cohere_insights": cohere_insights,
+                    "utterances": utterances,
+                    "speakers_updated": False,
                 }
             )
             if not created:
                 transcript.full_transcript = transcript_text
                 transcript.summary = summary
+                transcript.cohere_insights = cohere_insights
+                transcript.utterances = utterances
+                transcript.speakers_updated = False
                 transcript.save()
 
             return Response({
                 "full_transcript": transcript.full_transcript,
-                "summary": transcript.summary
+                "summary": transcript.summary,
+                "meeting_insights": transcript.cohere_insights,
+                "utterances": transcript.utterances,
+                "speakers_updated": transcript.speakers_updated
             })
 
         except Exception as e:
             return Response({"error": str(e)}, status=500)
 
 
+
+class ListSpeakersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, meeting_id):
+        meeting = get_object_or_404(Meeting, meeting_id=meeting_id)
+
+        if not hasattr(meeting, "transcript") or not meeting.transcript.utterances:
+            return Response({"speakers": []}, status=200)
+
+        transcript = meeting.transcript
+        if transcript.speakers_updated:
+            return Response(
+                {"message": "Speakers have already been updated."},
+                status=400
+            )
+
+        speaker_codes = {
+            f"Speaker {u['speaker']}"
+            for u in transcript.utterances
+            if 'speaker' in u
+        }
+
+        return Response({"speakers": sorted(speaker_codes)}, status=200)
+    
+
+
+class UpdateSpeakerNamesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, meeting_id):
+        meeting = get_object_or_404(Meeting, meeting_id=meeting_id)
+
+        if not hasattr(meeting, "transcript"):
+            return Response({"error": "Transcript not found"}, status=404)
+
+        speaker_map = request.data.get("speaker_map", {})
+        if not isinstance(speaker_map, dict):
+            return Response({"error": "Invalid speaker_map"}, status=400)
+
+        transcript = meeting.transcript
+
+        if getattr(transcript, "speakers_updated", False):
+            return Response(
+                {"message": "Speakers have already been updated."},
+                status=400
+            )
+
+        # Update utterances
+        updated_utterances = []
+        for utterance in transcript.utterances or []:
+            old_code = utterance.get("speaker")
+            if old_code in speaker_map:
+                utterance["speaker"] = speaker_map[old_code]
+            updated_utterances.append(utterance)
+
+        # Update full_transcript
+        full_transcript = transcript.full_transcript
+        for code, name in speaker_map.items():
+            full_transcript = re.sub(rf"\bSpeaker {re.escape(code)}\b", name, full_transcript)
+
+        # Update cohere_insights
+        insights = transcript.cohere_insights or {}
+
+        speaker_summaries = insights.get("speaker_summaries", {})
+        updated_summaries = {}
+        for key, value in speaker_summaries.items():
+            match = re.match(r"Speaker (\w+)", key)
+            if match:
+                code = match.group(1)
+                if code in speaker_map:
+                    updated_summaries[speaker_map[code]] = value
+                else:
+                    updated_summaries[key] = value
+            else:
+                updated_summaries[key] = value
+        insights["speaker_summaries"] = updated_summaries
+
+        structured = insights.get("structured_summary", "")
+        for code, name in speaker_map.items():
+            structured = re.sub(rf"\bSpeaker {re.escape(code)}\b", name, structured)
+        insights["structured_summary"] = structured
+
+        # Save all changes
+        transcript.utterances = updated_utterances
+        transcript.full_transcript = full_transcript
+        transcript.cohere_insights = insights
+        transcript.speaker_map = speaker_map
+        transcript.speakers_updated = True
+        transcript.save(update_fields=["utterances", "full_transcript", "cohere_insights", "speaker_map", "speakers_updated"])
+
+        return Response({"message": "Speakers updated successfully."}, status=200)
 

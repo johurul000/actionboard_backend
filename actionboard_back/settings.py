@@ -286,6 +286,8 @@ ZOOM_CLIENT_SECRET = env("ZOOM_CLIENT_SECRET", default="")
 
 
 ASSEMBLYAI_API_KEY = env("ASSEMBLYAI_API_KEY", default="")
+COHERE_API_KEY = env("COHERE_API_KEY", default="")
+
 
 # Live
 BACKEND_URL = "https://actionboard-backend-1.onrender.com"

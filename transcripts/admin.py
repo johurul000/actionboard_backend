@@ -5,7 +5,7 @@ from .models import Transcript, ActionItem
 class TranscriptAdmin(admin.ModelAdmin):
     list_display = ('meeting', 'language', 'created_at')
     list_filter = ('language',)
-    search_fields = ('meeting__title',)
+    search_fields = ('meeting__topic',)
 
 @admin.register(ActionItem)
 class ActionItemAdmin(admin.ModelAdmin):
