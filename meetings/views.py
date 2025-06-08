@@ -334,10 +334,12 @@ class MeetingDetailsView(APIView):
             try:
                 transcript = Transcript.objects.get(meeting=meeting)
                 transcript_data = {
-                    'full_transcript': transcript.full_transcript,
-                    'summary': transcript.summary,
-                    'language': transcript.language,
-                    'created_at': transcript.created_at.isoformat() if hasattr(transcript, 'created_at') else None,
+                    "full_transcript": transcript.full_transcript,
+                    "summary": transcript.summary,
+                    "meeting_insights": transcript.cohere_insights,
+                    "utterances": transcript.utterances,
+                    "speakers_updated": transcript.speakers_updated,
+                    "created_at": transcript.created_at.isoformat() if hasattr(transcript, 'created_at') else None,
                 }
             except Transcript.DoesNotExist:
                 pass
