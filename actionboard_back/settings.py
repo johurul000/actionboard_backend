@@ -267,7 +267,7 @@ SITE_ID = 1
 AUTH_USER_MODEL = 'users.CustomUser'
 
 
-CORS_ALLOW_ALL_ORIGINS = DEBUG
+CORS_ALLOW_ALL_ORIGINS = True
 
 CSRF_TRUSTED_ORIGINS = [
     'https://acd6-2409-408c-940a-3cf-761a-61f-7f1-8d9f.ngrok-free.app',
