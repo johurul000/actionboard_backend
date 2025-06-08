@@ -11,4 +11,4 @@ jobs:
 
     steps:
       - name: Ping Render app
-        run: curl -fsS --retry 3 https://actionboard-backend-cdqe.onrender.com/admin/ || echo "Ping failed"
+        run: curl -fsS --retry 3 https://actionboard-backend-1.onrender.com/admin/ || echo "Ping failed"
