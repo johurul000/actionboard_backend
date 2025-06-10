@@ -10,6 +10,8 @@ import cohere
 from collections import defaultdict
 import re
 from meetings.models import Meeting
+import logging
+logger = logging.getLogger(__name__)
 
 
 ASSEMBLYAI_ENDPOINT = "https://api.assemblyai.com/v2"
@@ -24,16 +26,14 @@ aai.settings.api_key = settings.ASSEMBLYAI_API_KEY
 
 
 def transcribe_recording_with_secure_url(meeting_id, user):
-    """
-    Downloads fresh Zoom audio recording, uploads to AssemblyAI for transcription,
-    and returns (transcript_text, summary).
-    """
-    meeting = Meeting.objects.get(meeting_id=meeting_id)
-
-
-    organisation = meeting.organisation
-    if not organisation:
-        raise Exception("Meeting not linked to an organisation.")
+    try:
+        meeting = Meeting.objects.get(meeting_id=meeting_id)
+        organisation = meeting.organisation
+        if not organisation:
+            raise Exception("Meeting not linked to an organisation.")
+    except Exception as e:
+        logger.exception("⚠️ Meeting/organisation fetch error")
+        raise
 
     try:
         oauth_token = OAuthToken.objects.get(
@@ -41,43 +41,68 @@ def transcribe_recording_with_secure_url(meeting_id, user):
             provider="zoom"
         )
     except OAuthToken.DoesNotExist:
+        logger.error("⚠️ Zoom OAuth token not found for organisation")
         raise Exception("Zoom OAuth token not found for this organisation.")
 
- 
-    recordings_resp = requests.get(
-        f"https://api.zoom.us/v2/meetings/{meeting_id}/recordings",
-        headers={"Authorization": f"Bearer {oauth_token.access_token}"}
-    )
-    recordings_resp.raise_for_status()
-    recordings_data = recordings_resp.json()
+    try:
+        logger.info(" Fetching Zoom recordings...")
+        recordings_resp = requests.get(
+            f"https://api.zoom.us/v2/meetings/{meeting_id}/recordings",
+            headers={"Authorization": f"Bearer {oauth_token.access_token}"}
+        )
+        recordings_resp.raise_for_status()
+        recordings_data = recordings_resp.json()
+    except Exception as e:
+        logger.exception("⚠️ Zoom recordings fetch failed")
+        raise
 
-    audio_file = next(
-        (f for f in recordings_data.get('recording_files', [])
-         if f['file_type'] == 'M4A'),
-        None
-    )
-    if not audio_file:
-        raise Exception("No audio recording found for this meeting.")
+    try:
+        audio_file = next(
+            (f for f in recordings_data.get('recording_files', [])
+             if f['file_type'] == 'M4A'),
+            None
+        )
+        if not audio_file:
+            raise Exception("No audio recording found for this meeting.")
+    except Exception as e:
+        logger.exception("⚠️ Audio file extraction failed")
+        raise
 
+    try:
+        download_url = f"{audio_file['download_url']}?access_token={oauth_token.access_token}"
+        local_audio_file = 'audio_file.m4a'
+        logger.info("⬇️ Downloading Zoom audio file...")
+        download_audio_to_file(download_url, local_audio_file)
+    except Exception as e:
+        logger.exception("⚠️ Audio download failed")
+        raise
 
-    download_url = f"{audio_file['download_url']}?access_token={oauth_token.access_token}"
+    try:
+        logger.info("⬆️ Uploading to AssemblyAI...")
+        assemblyai_audio_url = upload_audio_file_to_assemblyai(local_audio_file)
+    except Exception as e:
+        logger.exception("⚠️ AssemblyAI upload failed")
+        raise
 
+    try:
+        logger.info(" Transcribing with AssemblyAI...")
+        transcript_text, summary, utterances = transcribe_with_assembly_ai(assemblyai_audio_url)
+    except Exception as e:
+        logger.exception("⚠️ AssemblyAI transcription failed")
+        raise
 
-    local_audio_file = 'audio_file.m4a'
-    download_audio_to_file(download_url, local_audio_file)
+    try:
+        logger.info(" Analyzing with Cohere...")
+        cohere_insights = analyze_transcript_with_cohere(
+            utterances, cohere_api_key=settings.COHERE_API_KEY
+        )
+    except Exception as e:
+        logger.exception("⚠️ Cohere analysis failed")
+        raise
+    finally:
+        if os.path.exists(local_audio_file):
+            os.remove(local_audio_file)
 
-
-    assemblyai_audio_url = upload_audio_file_to_assemblyai(local_audio_file)
-
-
-    transcript_text, summary, utterances = transcribe_with_assembly_ai(assemblyai_audio_url)
-
-    os.remove(local_audio_file)
-
-    cohere_insights = analyze_transcript_with_cohere(
-        utterances,
-        cohere_api_key=settings.COHERE_API_KEY  
-    )
     return transcript_text, {
         "summary_text": summary,
         "utterances": [
@@ -92,7 +117,6 @@ def transcribe_recording_with_secure_url(meeting_id, user):
         "cohere_insights": cohere_insights
     }
 
-
 def analyze_transcript_with_cohere(utterances, cohere_api_key, timeout=300, poll_interval=5):
     """
     Analyzes meeting utterances using Cohere:
@@ -102,21 +126,20 @@ def analyze_transcript_with_cohere(utterances, cohere_api_key, timeout=300, poll
     """
     co = cohere.Client(cohere_api_key)
 
-    # 1️⃣ Format utterance transcript
+    # 1 Format utterance transcript
     utterance_transcript = "\n".join(
         f"Speaker {u['speaker']} | [{u['start'] / 1000}-{u['end'] / 1000}] {u['text']}"
         for u in utterances
     )
 
-    # 2️⃣ Structured Summary Prompt
+    # 2️ Structured Summary Prompt
     prompt = f"""
         You are an AI assistant that reads meeting transcripts and produces structured summaries.
         Please read the transcript below and return:
 
-        1. Minutes of the Meeting  
-        2. Meeting Agenda  
-        3. Key Points  
-        4. Action Items
+        1.**Meeting Agenda**
+        2. **Minutes of the Meeting**
+        4. **Action Items**
 
         Format your output using section headers.
 
