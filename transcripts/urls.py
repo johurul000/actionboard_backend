@@ -9,5 +9,8 @@ urlpatterns = [
     path("zoom/list-speakers/<str:meeting_id>/", ListSpeakersView.as_view(), name="list-speakers"),
     path("zoom/update-speakers/<str:meeting_id>/", UpdateSpeakerNamesView.as_view(), name="update-speakers"),
 
+    path("zoom/speaker-summaries/<str:meeting_id>/", GetSpeakerSummariesView.as_view(), name="get-speaker-summaries"),
+    path("zoom/update-speaker-summaries/<str:meeting_id>/", UpdateSpeakerSummariesView.as_view(), name="update-speaker-summaries"),
+
 ]
 
